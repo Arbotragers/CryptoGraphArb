@@ -3,6 +3,9 @@ import requests
 import os
 import json
 from tqdm import tqdm
+# from pqdm.processes import pqdm
+# If you want threads instead:
+# from pqdm.threads import pqdm
 
 AUTH = ""
 
@@ -12,13 +15,16 @@ def top_exchange_pairs():
     Returns all pairs from the top exchances (according to CryptoCompare),
     then writes the result to pairs_list.json.
     """
-    url = (
-        "https://min-api.cryptocompare.com/data/v3/all/exchanges?topTier=true&api_key="
-        + AUTH
-    )
-    r = requests.get(url)
-    with open("pairs_list.json", "w") as f:
-        json.dump(r.json(), f)
+    if os.path.exists('pairs_list.json'):
+        print('file exists, silly')
+    else:
+        url = (
+            "https://min-api.cryptocompare.com/data/v3/all/exchanges?topTier=true&api_key="
+            + AUTH
+        )
+        r = requests.get(url)
+        with open("pairs_list.json", "w") as f:
+            json.dump(r.json(), f)
 
 
 def binance_connected_pairs():
@@ -62,6 +68,25 @@ def download_snapshot(pair_dict, outfolder):
             print(e)
             print("Failure for", p1)
             continue
+    # def do_download(kv):
+    #     print('hello?')
+    #     try:
+    #         p1 = kv[0]
+    #         p2s = kv[1]
+    #         url = (
+    #             f"https://min-api.cryptocompare.com/data/ob/l1/top?fsyms={p1}"
+    #             + f"&tsyms={','.join(p2s)}&e=Binance&api_key="
+    #             + AUTH
+    #         )
+    #         r = requests.get(url)
+    #         with open(f"{outfolder}/{p1}_pairs_snapshot.json", "w") as f:
+    #             json.dump(r.json(), f)
+    #     except Exception as e:
+    #         print(e)
+    #         print("Failure for", p1)
+
+    # pqdm(pair_dict.items(), do_download, n_jobs=2,
+    #      exception_behaviour='immediate')
 
 
 def create_adj_matrix(pair_dict, snapshot_directory, outfile="snapshot.csv"):
@@ -79,7 +104,7 @@ def create_adj_matrix(pair_dict, snapshot_directory, outfile="snapshot.csv"):
     :type outfile: str
     """
     # Union of 'from' and 'to' pairs
-    flatten = lambda l: [item for sublist in l for item in sublist]
+    def flatten(l): return [item for sublist in l for item in sublist]
     all_pairs = list(set(pair_dict.keys()).union(flatten(pair_dict.values())))
 
     # Create empty df
@@ -88,13 +113,17 @@ def create_adj_matrix(pair_dict, snapshot_directory, outfile="snapshot.csv"):
     for p1 in pair_dict.keys():
         with open(f"{snapshot_directory}/{p1}_pairs_snapshot.json", "r") as f:
             res = json.load(f)
-        quotes = res["Data"]["RAW"][p1]
+        try:
+            quotes = res["Data"]["RAW"][p1]
+        except KeyError:
+            print(f"ERROR: fetching data from {p1}_pairs_snapshot.json")
+            continue
         for p2 in quotes:
             try:
                 df[p1][p2] = float(quotes[p2]["BID"])
                 df[p2][p1] = 1 / float(quotes[p2]["ASK"])
-            except KeyError:
-                print(f"Error for {p1}/{p2}")
+            except Exception as e:
+                print(f"Error for {p1}/{p2}...{e}")
                 continue
     df.to_csv(outfile)
 

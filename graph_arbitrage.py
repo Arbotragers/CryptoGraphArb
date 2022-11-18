@@ -70,7 +70,8 @@ def all_negative_cycles(g):
     all_paths = []
     for v in g.nodes():
         all_paths.append(bellman_ford_negative_cycles(g, v))
-    flatten = lambda l: [item for sublist in l for item in sublist]
+
+    def flatten(l): return [item for sublist in l for item in sublist]
     return [list(i) for i in set(tuple(j) for j in flatten(all_paths))]
 
 
@@ -91,10 +92,22 @@ def calculate_arb(cycle, g, verbose=True):
     total = 0
     for (p1, p2) in zip(cycle, cycle[1:]):
         total += g[p1][p2]["weight"]
+        print(p1, p2, g[p1][p2]["weight"], total)
+
+    """
+    So that minus 1...  What do you think that is?  Leading theory:
+    you put your initial 'investment' in to perform arbitrage.
+    As you progress through the graph, you are essentially multiplying
+    exchange rates between 'currencies' as you go, and the overall
+    exchange rate should be subtracted by 1 to represent the 'profit'
+    you get in this arbitrage operation.
+    """
     arb = np.exp(-total) - 1
     if verbose:
         print("Path:", cycle)
-        print(f"{arb*100:.2g}%\n")
+        print(f"{arb*100:.2g}%")
+        print(arb)
+        print("\n")
     return arb
 
 
@@ -129,8 +142,10 @@ def find_arbitrage(filename="snapshot.csv", find_all=False, sources=None):
             all_paths = []
             for s in sources:
                 all_paths.append(bellman_ford_negative_cycles(g, s))
-            flatten = lambda l: [item for sublist in l for item in sublist]
-            unique_cycles = [list(i) for i in set(tuple(j) for j in flatten(all_paths))]
+
+            def flatten(l): return [item for sublist in l for item in sublist]
+            unique_cycles = [list(i) for i in set(tuple(j)
+                                                  for j in flatten(all_paths))]
 
         for p in unique_cycles:
             calculate_arb(p, g)
